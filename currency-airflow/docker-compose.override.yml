@@ -1,0 +1,58 @@
+services:
+  mongodb:
+    build:
+      context: .
+      dockerfile: docker/mongodb.Dockerfile
+    image: assignment3-mongodb:local
+    restart: unless-stopped
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+
+    volumes:
+      - currency_mongo_data:/data/db
+
+    networks:
+      - airflow
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin
+          --eval 'db.adminCommand({ping:1})'
+          > /dev/null
+      interval: 10s
+      timeout: 20s
+      retries: 12
+      start_period: 60s
+
+  mongo-express:
+    build:
+      context: .
+      dockerfile: docker/mongo-express.Dockerfile
+    image: assignment3-mongo-express:local
+    restart: unless-stopped
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+    ports:
+      - "127.0.0.1:8081:8081"
+
+    environment:
+      ME_CONFIG_MONGODB_URL: ${MONGODB_URI}
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_BASICAUTH_ENABLED: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+
+    networks:
+      - airflow
+volumes:
+  currency_mongo_data:
+
